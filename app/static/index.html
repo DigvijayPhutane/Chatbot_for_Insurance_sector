@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support Assistant</title>
+<style>
+  :root {
+    --bg: #f4f6f9; --panel: #ffffff; --border: #dde2ea; --text: #1d2433; --muted: #667085;
+    --accent: #2563eb; --accent-soft: #e8efff; --agent: #2563eb; --bot: #f1f4f8;
+    --ok: #157f3b; --ok-bg: #e3f6ea; --warn: #9a6200; --warn-bg: #fff3d6; --bad: #b42318; --bad-bg: #fde8e7;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; color: var(--text); background: var(--bg); }
+  header { background: var(--panel); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px; }
+  header h1 { font-size: 16px; margin: 0; }
+  header span { color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: 340px 1fr; gap: 16px; padding: 16px; height: calc(100vh - 53px); }
+  .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; overflow: auto; }
+  aside { padding: 16px; }
+  label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  select { width: 100%; margin: 6px 0 16px; padding: 8px; border: 1px solid var(--border); border-radius: 6px; font: inherit; background: #fff; }
+  h2 { font-size: 13px; margin: 16px 0 8px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .kv { display: grid; grid-template-columns: 90px 1fr; gap: 2px 8px; font-size: 13px; }
+  .kv dt { color: var(--muted); }
+  .kv dd { margin: 0; word-break: break-word; }
+  .policy { border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 10px; font-size: 13px; }
+  .policy .top { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+  .policy b { display: block; }
+  .policy small { color: var(--muted); }
+  .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .ok { color: var(--ok); background: var(--ok-bg); } .warn { color: var(--warn); background: var(--warn-bg); } .bad { color: var(--bad); background: var(--bad-bg); }
+  .claim { margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--border); }
+  .chat { display: flex; flex-direction: column; overflow: hidden; }
+  #messages { flex: 1; overflow: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px; }
+  .msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; white-space: pre-wrap; }
+  .msg.agent { align-self: flex-end; background: var(--agent); color: #fff; border-bottom-right-radius: 4px; }
+  .msg.bot { align-self: flex-start; background: var(--bot); border-bottom-left-radius: 4px; }
+  .meta { margin-top: 8px; font-size: 12px; color: var(--muted); white-space: normal; }
+  .tag { display: inline-block; background: var(--accent-soft); color: var(--accent); border-radius: 4px; padding: 1px 6px; margin: 2px 4px 0 0; font-size: 11px; }
+  .empty { margin: auto; text-align: center; color: var(--muted); }
+  #suggestions { padding: 0 20px 10px; display: flex; flex-wrap: wrap; gap: 6px; }
+  #suggestions button { border: 1px solid var(--border); background: #fff; border-radius: 999px; padding: 4px 12px; font: inherit; font-size: 12px; cursor: pointer; }
+  #suggestions button:hover { border-color: var(--accent); color: var(--accent); }
+  form { display: flex; gap: 8px; padding: 12px 20px; border-top: 1px solid var(--border); }
+  form input { flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font: inherit; }
+  form button { padding: 10px 18px; border: 0; border-radius: 8px; background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer; }
+  form button:disabled, form input:disabled { opacity: .5; cursor: not-allowed; }
+  @media (max-width: 800px) { main { grid-template-columns: 1fr; height: auto; } .chat { height: 80vh; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Insurance Support Assistant</h1>
+  <span>Look up a customer and ask about their policies</span>
+</header>
+<main>
+  <aside class="panel">
+    <label for="customer">Customer on the line</label>
+    <select id="customer"><option value="">Select a customer…</option></select>
+    <div id="profile"></div>
+  </aside>
+  <section class="panel chat">
+    <div id="messages"><div class="empty">Select a customer to start.</div></div>
+    <div id="suggestions"></div>
+    <form id="form">
+      <input id="input" placeholder="Ask about this customer's policy, premium, claims…" autocomplete="off" disabled>
+      <button id="send" disabled>Ask</button>
+    </form>
+  </section>
+</main>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const rs = (n) => n == null ? "-" : "Rs. " + Number(n).toLocaleString("en-IN");
+const SUGGESTIONS = ["Is the policy active?", "When is the next premium due?", "What is the status of the claim?",
+                     "What is the waiting period for pre-existing diseases?", "What is not covered?", "How do I file a claim?"];
+let customerId = "", sessionId = null;
+
+function badge(status) {
+  const s = (status || "").toLowerCase();
+  const cls = s.startsWith("active") || ["paid", "settled", "approved", "verified"].includes(s) ? "ok"
+            : s.includes("lapsed") || s.includes("overdue") || s.includes("rejected") ? "bad" : "warn";
+  return `<span class="badge ${cls}">${esc(status)}</span>`;
+}
+
+async function loadCustomers() {
+  const list = await fetch("/api/customers").then((r) => r.json());
+  $("customer").innerHTML += list.map((c) =>
+    `<option value="${esc(c.customer_id)}">${esc(c.name)} · ${esc(c.customer_id)}</option>`).join("");
+}
+
+async function selectCustomer(id) {
+  customerId = id; sessionId = null;
+  $("messages").innerHTML = `<div class="empty">${id ? "Ask a question about this customer." : "Select a customer to start."}</div>`;
+  $("input").disabled = $("send").disabled = !id;
+  $("suggestions").innerHTML = id ? SUGGESTIONS.map((q) => `<button type="button">${esc(q)}</button>`).join("") : "";
+  $("profile").innerHTML = "";
+  if (!id) return;
+
+  const { customer: c, policies } = await fetch(`/api/customers/${encodeURIComponent(id)}`).then((r) => r.json());
+  $("profile").innerHTML = `
+    <h2>Customer</h2>
+    <dl class="kv">
+      <dt>Name</dt><dd>${esc(c.name)}</dd>
+      <dt>ID</dt><dd>${esc(c.customer_id)}</dd>
+      <dt>Mobile</dt><dd>${esc(c.mobile)}</dd>
+      <dt>Email</dt><dd>${esc(c.email)}</dd>
+      <dt>City</dt><dd>${esc(c.city)}</dd>
+      <dt>KYC</dt><dd>${badge(c.kyc_status)}</dd>
+    </dl>
+    <h2>Policies (${policies.length})</h2>
+    ${policies.map((p) => `
+      <div class="policy">
+        <div class="top"><div><b>${esc(p.product)}</b><small>${esc(p.policy_number)}</small></div>${badge(p.status)}</div>
+        <dl class="kv" style="margin-top:6px">
+          <dt>Type</dt><dd>${esc(p.policy_type)}</dd>
+          <dt>Period</dt><dd>${esc(p.start_date)} → ${esc(p.end_date)}</dd>
+          <dt>Sum insured</dt><dd>${rs(p.sum_insured)}</dd>
+          <dt>Premium</dt><dd>${rs(p.total_premium)} ${badge(p.premium_status)}</dd>
+          <dt>Next due</dt><dd>${esc(p.next_due_date || "-")}</dd>
+        </dl>
+        ${p.claims.map((cl) => `
+          <div class="claim"><div class="top"><small>${esc(cl.claim_id)} · ${esc(cl.claim_type)}</small>${badge(cl.status)}</div>
+          <small>Filed ${esc(cl.filed_on)} · claimed ${rs(cl.amount_claimed)}${cl.amount_approved ? " · approved " + rs(cl.amount_approved) : ""}</small></div>`).join("")}
+      </div>`).join("")}`;
+}
+
+function addMessage(role, html) {
+  const empty = $("messages").querySelector(".empty");
+  if (empty) empty.remove();
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  div.innerHTML = html;
+  $("messages").appendChild(div);
+  $("messages").scrollTop = $("messages").scrollHeight;
+  return div;
+}
+
+async function ask(question) {
+  if (!question || !customerId) return;
+  addMessage("agent", esc(question));
+  const pending = addMessage("bot", "<i>Looking it up…</i>");
+  $("input").disabled = $("send").disabled = true;
+  try {
+    const res = await fetch("/chat", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ customer_id: customerId, message: question, session_id: sessionId }),
+    });
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    const data = await res.json();
+    sessionId = data.session_id;
+    const labels = [...new Set(data.sources.map((s) => `${s.section} ${s.subsection} · p.${s.page}`.replace(/\s+/g, " ")))];
+    const sources = labels.map((l) => `<span class="tag">${esc(l)}</span>`).join("");
+    pending.innerHTML = esc(data.answer) +
+      `<div class="meta">Route: ${data.routes.map((r) => `<span class="tag">${esc(r)}</span>`).join("")}` +
+      (sources ? `<br>Sources: ${sources}` : "") + `</div>`;
+  } catch (err) {
+    pending.innerHTML = `<span style="color:var(--bad)">${esc(err.message)}</span>`;
+  } finally {
+    $("input").disabled = $("send").disabled = false;
+    $("input").focus();
+  }
+}
+
+$("customer").addEventListener("change", (e) => selectCustomer(e.target.value));
+$("form").addEventListener("submit", (e) => { e.preventDefault(); const q = $("input").value.trim(); $("input").value = ""; ask(q); });
+$("suggestions").addEventListener("click", (e) => { if (e.target.tagName === "BUTTON") ask(e.target.textContent); });
+loadCustomers();
+</script>
+</body>
+</html>

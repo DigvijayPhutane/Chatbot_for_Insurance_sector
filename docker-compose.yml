@@ -1,0 +1,66 @@
+
+x-env: &env
+  AWS_ENDPOINT_URL: http://floci:4566
+  AWS_ACCESS_KEY_ID: test
+  AWS_SECRET_ACCESS_KEY: test
+  AWS_DEFAULT_REGION: us-east-1
+  S3_BUCKET: insurance-docs
+  CUSTOMER_API_URL: http://customer-api:8001
+  # Ollama runs on Windows (no NVIDIA GPU here for a container to use).
+  OLLAMA_HOST: http://host.docker.internal:11434
+  INTENT_MODEL: ${INTENT_MODEL}
+  MAIN_MODEL: ${MAIN_MODEL}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL}
+  RERANKER_MODEL: ${RERANKER_MODEL}
+  OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX}
+
+services:
+  floci:
+    image: floci/floci:latest
+    ports:
+      - "127.0.0.1:4566:4566"
+    environment:
+      FLOCI_HOSTNAME: floci
+      FLOCI_STORAGE_MODE: persistent
+    volumes:
+      - floci-data:/app/data
+
+  customer-api:
+    build: .
+    command: uvicorn customer_api.server:app --host 0.0.0.0 --port 8001
+    environment: *env
+    ports:
+      - "127.0.0.1:8001:8001"
+    depends_on:
+      floci:
+        condition: service_healthy   # downloads insurance.db from S3 at startup
+
+  app:
+    build: .
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+    environment: *env
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./vectorstore:/app/vectorstore
+      - hf-cache:/root/.cache/huggingface
+    depends_on:
+      - customer-api
+
+  indexer:
+    build: .
+    command: sh -c "python -m ingestion.dms && python -m ingestion.index"
+    environment: *env
+    volumes:
+      - ./files:/app/files
+      - ./vectorstore:/app/vectorstore
+      - hf-cache:/root/.cache/huggingface
+    depends_on:
+      floci:
+        condition: service_healthy
+    profiles:
+      - tools
+
+volumes:
+  floci-data:
+  hf-cache:

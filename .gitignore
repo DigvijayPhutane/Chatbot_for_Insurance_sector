@@ -1,0 +1,7 @@
+venv/
+.env
+vectorstore/
+__pycache__/
+.claude/
+.agents/
+customer_api/insurance.db
