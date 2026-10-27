@@ -43,6 +43,10 @@ agent question ──► intent classifier (llama3.2:1b)
 | `app/cli.py` | Terminal chat for quick testing |
 | `files/` | Policy PDFs (fictional specimens) |
 | `vectorstore/` | ChromaDB data and the hash manifest (generated) |
+| `tests/` | Unit tests, plus integration tests against Floci in `tests/integration/` |
+| `evaluation/` | Question set and evaluation runner |
+| `.github/workflows/` | CI, evaluation and deploy pipelines |
+| `scripts/deploy.sh` | Deploy steps run on the server |
 
 ## Requirements
 
@@ -115,6 +119,57 @@ Settings are read from `.env`; see `.env_example` for the full list.
 - **Add or update a policy document:** put the PDF in `files/`, then run `ingestion.dms` and `ingestion.index` again. Unchanged documents are skipped. Then add the PDF's file name as the `document_key` of the matching policy in `customer_api/db.py`, because retrieval only searches documents linked to the customer's policies.
 - **Reset the customer database:** `python -m customer_api.db` reloads the sample data and uploads it to `s3://insurance-docs/database/insurance.db`. The customer API downloads it from there at startup.
 - **Rebuild the vector index:** delete `vectorstore/chroma` and `vectorstore/manifest.json`, then run `ingestion.index`.
+
+## Tests
+
+```powershell
+.\venv\Scripts\python.exe -m pip install -r requirements-dev.txt
+.\venv\Scripts\python.exe -m pytest              # all tests
+.\venv\Scripts\python.exe -m ruff check .        # lint
+```
+
+The unit tests run in about 20 seconds and need no Ollama, no S3 and no model downloads. Models, S3 and the vector store are replaced by small offline fakes in `tests/helpers.py`. Together they cover:
+
+- **Chunking:** heading detection, header and footer removal, token limits, and the real policy PDFs.
+- **Indexing:** the hash check (new, unchanged, updated and removed documents, an embedding-model change, a wiped store).
+- **Retrieval:** customer isolation, RRF and BM25.
+- **Routing:** the intent post-processing rules.
+- **Context and answers:** how the context is built and how answers are streamed.
+- **The two APIs.**
+
+The tests in `tests/integration/` use a real Floci S3 (`AWS_ENDPOINT_URL`). They are skipped when Floci isn't running. In CI, `REQUIRE_INTEGRATION=1` turns that skip into a failure.
+
+## Evaluation
+
+`evaluation/dataset.json` holds 22 questions with answers checked against the policy PDFs and the sample data. The evaluation scores each stage separately, so a drop can be traced to its cause:
+
+| Stage | Metric | Pass threshold |
+|---|---|---|
+| Routing | Share of questions where the classifier picks the expected routes | 0.85 |
+| Retrieval | Expected section in the top 5 (hit@5) / mean reciprocal rank | 0.90 / 0.75 |
+| Answer | Share of answers containing every expected fact | 0.75 |
+| Isolation | Answers citing another customer's document | 0 |
+
+Two of the questions have no answer in the customer's documents, so the bot passes them only by saying the information isn't available rather than inventing it.
+
+Running it needs Ollama, an indexed vector store and the customer API:
+
+```powershell
+.\venv\Scripts\python.exe -m evaluation.run_eval                              # everything (several minutes on CPU)
+.\venv\Scripts\python.exe -m evaluation.run_eval --stages routing,retrieval   # fast, no answer generation
+```
+
+The report is written to `evaluation/results/report.md`, and the command exits with an error if any score is below its threshold. Run it after changing a model, a prompt, the chunking or the retrieval settings, and add a case to the dataset whenever an agent reports a wrong answer.
+
+## CI/CD (GitHub Actions)
+
+| Workflow | When it runs | What it does |
+|---|---|---|
+| `ci.yml` | Every push to `main` and every pull request | Ruff lint; all tests, with Floci as a service container; Compose validation and image build |
+| `eval.yml` | On demand (Actions > Evaluation > Run workflow) and Mondays 03:00 UTC | Installs Ollama, indexes the PDFs, runs the evaluation, and attaches the report to the run |
+| `deploy.yml` | After CI passes on `main`, or on demand | Connects to the server over SSH and runs `scripts/deploy.sh` (check out the tested commit, rebuild, re-index, smoke-test) |
+
+Deploy stays switched off until you set the `DEPLOY_*` secrets listed at the top of `deploy.yml`. The server needs a clone of this repo at `DEPLOY_PATH`, Docker, and Ollama listening on an address the containers can reach (`OLLAMA_HOST=0.0.0.0`). To approve each deploy by hand, add required reviewers to the `production` environment under Settings > Environments.
 
 ## Sample customers
 

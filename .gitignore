@@ -5,3 +5,9 @@ __pycache__/
 .claude/
 .agents/
 customer_api/insurance.db
+
+# Test and evaluation output
+.pytest_cache/
+.ruff_cache/
+test-results.xml
+evaluation/results/

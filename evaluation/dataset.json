@@ -1,0 +1,180 @@
+[
+  {
+    "id": "health-waiting-ped",
+    "customer_id": "CUST-88274615",
+    "question": "What is the waiting period for pre-existing diseases like diabetes?",
+    "routes": ["rag"],
+    "sections": ["6. Waiting Periods"],
+    "must_include": [["36 months", "3 years"]]
+  },
+  {
+    "id": "health-cataract-sublimit",
+    "customer_id": "CUST-88274615",
+    "question": "What is the sub-limit for cataract surgery?",
+    "routes": ["rag"],
+    "sections": ["7. Sub-limits"],
+    "must_include": [["40,000"]]
+  },
+  {
+    "id": "health-maternity-caesarean",
+    "customer_id": "CUST-88274615",
+    "question": "How much does the policy pay for a caesarean delivery?",
+    "routes": ["rag"],
+    "sections": ["5. Benefit Summary"],
+    "must_include": [["75,000"]]
+  },
+  {
+    "id": "health-post-hospitalisation",
+    "customer_id": "CUST-88274615",
+    "question": "For how many days after discharge are post-hospitalisation expenses covered?",
+    "routes": ["rag"],
+    "sections": ["5. Benefit Summary"],
+    "must_include": [["90 days"]]
+  },
+  {
+    "id": "health-ivf-excluded",
+    "customer_id": "CUST-88274615",
+    "question": "Is IVF treatment covered?",
+    "routes": ["rag"],
+    "sections": ["9. Permanent Exclusions"],
+    "must_include": [["exclu", "not covered", "no,", "not payable", "isn't covered", "is not"]]
+  },
+  {
+    "id": "health-reimbursement-documents",
+    "customer_id": "CUST-88274615",
+    "question": "Within how many days of discharge must documents be submitted for a reimbursement claim?",
+    "routes": ["rag"],
+    "sections": ["11. Claims Procedure"],
+    "must_include": [["30 days"]]
+  },
+  {
+    "id": "health-cancellation-refund",
+    "customer_id": "CUST-88274615",
+    "question": "If the customer cancels the policy after 2 months, how much premium is refunded?",
+    "routes": ["rag"],
+    "sections": ["12. Free Look, Cancellation and Renewal"],
+    "must_include": [["50%", "50 percent"]]
+  },
+  {
+    "id": "health-copay-network",
+    "customer_id": "CUST-88274615",
+    "question": "Is there any co-payment for planned treatment at a non-network hospital?",
+    "routes": ["rag"],
+    "sections": ["8. Co-payment and Deductibles"],
+    "must_include": [["10%", "10 percent"]]
+  },
+  {
+    "id": "rohan-policy-status",
+    "customer_id": "CUST-88274615",
+    "question": "Is the customer's health policy active, and when is the next premium due?",
+    "routes": ["policy_status"],
+    "sections": [],
+    "must_include": [["active"], ["2027-04-01", "01-apr-2027", "1 april 2027", "april 1, 2027", "1st april 2027", "01 april 2027"]]
+  },
+  {
+    "id": "rohan-email",
+    "customer_id": "CUST-88274615",
+    "question": "What is the customer's registered email address?",
+    "routes": ["customer_details"],
+    "sections": [],
+    "must_include": [["rohan.mehta.demo@example.com"]]
+  },
+  {
+    "id": "home-jewellery-sum-insured",
+    "customer_id": "MSG-CU-30419277",
+    "question": "What is the sum insured for jewellery and valuables?",
+    "routes": ["rag"],
+    "sections": ["3. Schedule of Cover & Sums Insured", "4. Valuation Report Summary"],
+    "must_include": [["8,50,000", "850,000", "8.5 lakh"]]
+  },
+  {
+    "id": "home-earthquake-deductible",
+    "customer_id": "MSG-CU-30419277",
+    "question": "What is the deductible for an earthquake claim on the building?",
+    "routes": ["rag"],
+    "sections": ["7. Deductibles (Excess)"],
+    "must_include": [["5%", "5 percent"]]
+  },
+  {
+    "id": "home-flood-peril",
+    "customer_id": "MSG-CU-30419277",
+    "question": "Is flood damage to the house covered?",
+    "routes": ["rag"],
+    "sections": ["6. Insured Perils (Sections 1 and 2)"],
+    "must_include": []
+  },
+  {
+    "id": "home-report-loss",
+    "customer_id": "MSG-CU-30419277",
+    "question": "Within how many days must the customer report a loss to the insurer?",
+    "routes": ["rag"],
+    "sections": ["13. Claims Procedure"],
+    "must_include": [["7 days", "seven days"]]
+  },
+  {
+    "id": "home-appliance-breakdown",
+    "customer_id": "MSG-CU-30419277",
+    "question": "Is mechanical breakdown of household appliances covered?",
+    "routes": ["rag"],
+    "sections": ["10. General Exclusions"],
+    "must_include": [["exclu", "not covered", "no,", "not liable", "isn't covered", "is not"]]
+  },
+  {
+    "id": "home-renewal-grace",
+    "customer_id": "MSG-CU-30419277",
+    "question": "When is the home policy renewal due, and is there a grace period?",
+    "routes": ["rag"],
+    "sections": ["14. Cancellation & Renewal"],
+    "must_include": [["15-jun-2027", "2027-06-15", "15 june 2027", "june 15, 2027", "15th june 2027"], ["no grace", "not have a grace", "not a grace", "isn't a grace", "without a grace", "not provide a grace"]]
+  },
+  {
+    "id": "sneha-claim-status",
+    "customer_id": "MSG-CU-30419277",
+    "question": "What is the status of the customer's claim?",
+    "routes": ["policy_status"],
+    "sections": [],
+    "must_include": [["under review"]]
+  },
+  {
+    "id": "sneha-no-health-policy",
+    "customer_id": "MSG-CU-30419277",
+    "question": "What is the waiting period for diabetes?",
+    "routes": ["rag"],
+    "sections": [],
+    "must_include": [["not available", "no information", "don't have", "do not have", "not mentioned", "not provided", "not in", "unable", "escalate", "cannot", "can't", "not specified", "does not", "doesn't", "no mention", "not found", "not include"]],
+    "note": "Sneha only has a home policy; the health policy must not be searched (customer isolation)."
+  },
+  {
+    "id": "priya-grace-overdue",
+    "customer_id": "CUST-10000001",
+    "question": "Is the customer's motor policy active, and is the premium paid?",
+    "routes": ["policy_status"],
+    "sections": [],
+    "must_include": [["grace"], ["overdue", "not paid", "unpaid", "not been paid", "due"]]
+  },
+  {
+    "id": "priya-no-document",
+    "customer_id": "CUST-10000001",
+    "question": "Does the motor policy cover engine damage caused by flooding?",
+    "routes": ["rag"],
+    "sections": [],
+    "must_include": [["not available", "no information", "don't have", "do not have", "not mentioned", "not provided", "not in", "unable", "escalate", "cannot", "can't", "not specified", "does not", "doesn't", "no mention", "not found", "not include"]],
+    "note": "No policy document is linked to this policy, so the bot must not invent coverage."
+  },
+  {
+    "id": "amit-lapsed",
+    "customer_id": "CUST-10000002",
+    "question": "What is the status of the customer's life policy?",
+    "routes": ["policy_status"],
+    "sections": [],
+    "must_include": [["lapsed"]]
+  },
+  {
+    "id": "small-talk",
+    "customer_id": "CUST-88274615",
+    "question": "Thanks, that's all for now!",
+    "routes": ["general"],
+    "sections": [],
+    "must_include": []
+  }
+]

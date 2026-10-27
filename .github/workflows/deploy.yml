@@ -1,0 +1,60 @@
+name: Deploy
+
+# Deploys a commit to the server once CI has passed on main, or on demand.
+# Set these repository secrets first (Settings > Secrets and variables > Actions):
+#   DEPLOY_HOST         server hostname or IP
+#   DEPLOY_USER         SSH user on the server (member of the docker group)
+#   DEPLOY_SSH_KEY      private key whose public key is in that user's ~/.ssh/authorized_keys
+#   DEPLOY_KNOWN_HOSTS  output of `ssh-keyscan <host>`, checked once by hand
+#   DEPLOY_PATH         path of the git clone on the server, e.g. /opt/insurance-bot
+# Without DEPLOY_HOST the job is skipped, so CI stays green before a server exists.
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push')
+    runs-on: ubuntu-latest
+    environment: production   # add required reviewers to this environment to approve each deploy
+    env:
+      DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+      SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+    steps:
+      - name: Check deploy settings
+        id: check
+        run: |
+          if [ -z "$DEPLOY_HOST" ]; then
+            echo "::notice::DEPLOY_HOST secret is not set - skipping deploy"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: actions/checkout@v5
+        if: steps.check.outputs.skip != 'true'
+        with:
+          ref: ${{ env.SHA }}
+      - name: Deploy over SSH
+        if: steps.check.outputs.skip != 'true'
+        env:
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.DEPLOY_KNOWN_HOSTS }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          ssh -i ~/.ssh/deploy_key "$DEPLOY_USER@$DEPLOY_HOST" \
+            "DEPLOY_PATH='$DEPLOY_PATH' SHA='$SHA' bash -s" < scripts/deploy.sh

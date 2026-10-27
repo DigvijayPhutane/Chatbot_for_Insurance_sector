@@ -47,7 +47,7 @@ def _dense_search(collection, query, sources):
         where={"source": {"$in": sources}},
         include=["documents", "metadatas"],
     )
-    return list(zip(res["ids"][0], res["documents"][0], res["metadatas"][0]))
+    return list(zip(res["ids"][0], res["documents"][0], res["metadatas"][0], strict=True))
 
 
 def _bm25_search(collection, query, sources):
@@ -84,5 +84,5 @@ def retrieve(query: str, sources: list[str], top_k: int = 5) -> list[dict]:
     if not candidates:
         return []
     scores = _reranker().predict([(query, doc) for _, doc, _ in candidates])
-    ranked = sorted(zip(candidates, scores), key=lambda x: x[1], reverse=True)[:top_k]
+    ranked = sorted(zip(candidates, scores, strict=True), key=lambda x: x[1], reverse=True)[:top_k]
     return [{"text": doc, "metadata": meta, "score": float(score)} for (_, doc, meta), score in ranked]

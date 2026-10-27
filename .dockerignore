@@ -5,3 +5,8 @@ __pycache__/
 .claude/
 .agents/
 customer_api/insurance.db
+.git/
+.github/
+.pytest_cache/
+.ruff_cache/
+evaluation/results/

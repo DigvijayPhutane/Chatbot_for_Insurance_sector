@@ -6,13 +6,20 @@ x-env: &env
   AWS_DEFAULT_REGION: us-east-1
   S3_BUCKET: insurance-docs
   CUSTOMER_API_URL: http://customer-api:8001
-  # Ollama runs on Windows (no NVIDIA GPU here for a container to use).
+  # Ollama runs on the host (no NVIDIA GPU here for a container to use).
   OLLAMA_HOST: http://host.docker.internal:11434
-  INTENT_MODEL: ${INTENT_MODEL}
-  MAIN_MODEL: ${MAIN_MODEL}
-  EMBEDDING_MODEL: ${EMBEDDING_MODEL}
-  RERANKER_MODEL: ${RERANKER_MODEL}
-  OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX}
+  INTENT_MODEL: ${INTENT_MODEL:-llama3.2:1b}
+  MAIN_MODEL: ${MAIN_MODEL:-llama3.2:latest}
+  EMBEDDING_MODEL: ${EMBEDDING_MODEL:-all-minilm:l6-v2}
+  RERANKER_MODEL: ${RERANKER_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
+  OLLAMA_NUM_CTX: ${OLLAMA_NUM_CTX:-8192}
+
+# Shared by the Python services. host-gateway makes host.docker.internal resolve on Linux too.
+x-python: &python
+  build: .
+  environment: *env
+  extra_hosts:
+    - "host.docker.internal:host-gateway"
 
 services:
   floci:
@@ -24,21 +31,21 @@ services:
       FLOCI_STORAGE_MODE: persistent
     volumes:
       - floci-data:/app/data
+    restart: unless-stopped
 
   customer-api:
-    build: .
+    <<: *python
     command: uvicorn customer_api.server:app --host 0.0.0.0 --port 8001
-    environment: *env
     ports:
       - "127.0.0.1:8001:8001"
     depends_on:
       floci:
         condition: service_healthy   # downloads insurance.db from S3 at startup
+    restart: unless-stopped
 
   app:
-    build: .
+    <<: *python
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
-    environment: *env
     ports:
       - "127.0.0.1:8000:8000"
     volumes:
@@ -46,11 +53,11 @@ services:
       - hf-cache:/root/.cache/huggingface
     depends_on:
       - customer-api
+    restart: unless-stopped
 
   indexer:
-    build: .
+    <<: *python
     command: sh -c "python -m ingestion.dms && python -m ingestion.index"
-    environment: *env
     volumes:
       - ./files:/app/files
       - ./vectorstore:/app/vectorstore

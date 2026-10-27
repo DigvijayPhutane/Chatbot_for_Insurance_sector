@@ -2,12 +2,14 @@ import uuid
 from pathlib import Path
 
 import httpx
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
-from dotenv import load_dotenv
+
 load_dotenv()
-from rag.chatbot import CUSTOMER_API_URL, Chatbot
+
+from rag.chatbot import CUSTOMER_API_URL, Chatbot  # noqa: E402  (needs .env loaded first)
 
 app = FastAPI(title="Insurance Support Assistant")
 sessions: dict[str, Chatbot] = {}  # in-memory; use Redis or a DB for production
