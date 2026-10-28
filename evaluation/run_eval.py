@@ -11,6 +11,7 @@ Exits with status 1 when a score is below its threshold.
     python -m evaluation.run_eval
     python -m evaluation.run_eval --stages routing,retrieval      # fast: no answer generation
     python -m evaluation.run_eval --ids sneha-claim-status,amit-lapsed
+    python -m evaluation.run_eval --resume                          # continue an interrupted run
 """
 
 import argparse
@@ -153,8 +154,12 @@ def main():
     parser.add_argument("--ids", help="comma-separated case ids to run (default: all)")
     parser.add_argument("--min-routing", type=float, default=0.85)
     parser.add_argument("--min-hit", type=float, default=0.9)
-    parser.add_argument("--min-mrr", type=float, default=0.75)
-    parser.add_argument("--min-answer", type=float, default=0.75)
+    # Baseline on 2026-10-27 (llama3.2:1b / llama3.2:latest / ms-marco-MiniLM-L-6-v2): routing 0.909,
+    # hit@5 1.0, MRR 0.964, answers 0.90. Thresholds leave some room for run-to-run variation.
+    parser.add_argument("--min-mrr", type=float, default=0.85)
+    parser.add_argument("--min-answer", type=float, default=0.8)
+    parser.add_argument("--resume", action="store_true",
+                        help="keep the cases already finished by an interrupted run (same --stages)")
     args = parser.parse_args()
 
     stages = set(args.stages.split(","))
@@ -163,10 +168,31 @@ def main():
         wanted = set(args.ids.split(","))
         cases = [c for c in cases if c["id"] in wanted]
 
+    # Each finished case is appended here, so a crash part-way through loses at most one case.
+    RESULTS.mkdir(exist_ok=True)
+    progress = RESULTS / "progress.jsonl"
+    done = {}
+    if args.resume and progress.exists():
+        done = {r["id"]: r for r in map(json.loads, progress.read_text(encoding="utf-8").splitlines())}
+    else:
+        progress.write_text("", encoding="utf-8")
+
     results = []
     for i, case in enumerate(cases, 1):
+        if case["id"] in done:
+            result = done[case["id"]]
+            if "answer" in result:  # re-score the saved answer, in case the expected facts were edited
+                answer = result["answer"]
+                answer["missing"] = missing_facts(answer["text"], case["must_include"])
+                answer["scored"] = bool(case["must_include"])
+                answer["ok"] = not answer["missing"] and not answer["foreign_sources"]
+            results.append(result)
+            continue
         print(f"[{i}/{len(cases)}] {case['id']}", flush=True)
-        results.append(eval_case(case, stages))
+        result = eval_case(case, stages)
+        results.append(result)
+        with progress.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(result) + "\n")
 
     summary = summarize(results)
     thresholds = {"routing_accuracy": args.min_routing, "retrieval_hit_at_5": args.min_hit,
@@ -177,7 +203,6 @@ def main():
         failures.append(f"{summary['isolation_violations']} answer(s) cited another customer's document")
 
     text = report(summary, results, thresholds, failures)
-    RESULTS.mkdir(exist_ok=True)
     (RESULTS / "report.md").write_text(text, encoding="utf-8")
     (RESULTS / "results.json").write_text(json.dumps({"summary": summary, "results": results}, indent=2),
                                           encoding="utf-8")

@@ -1,0 +1,122 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Insurance Support Assistant - System Architecture",
+    "output": ".archify/architecture-insurance-support-20261028-155750/insurance-support-architecture.html",
+    "quality_profile": "showcase",
+    "locale": "en",
+    "repository": {
+      "url": "https://github.com/DigvijayPhutane/Chatbot_for_Insurance_sector.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "de52bc8affb740281b7185b81ca372e07e8a77a2"
+    }
+  },
+  "components": [
+    { "id": "agent", "type": "external", "label": "Support agent", "sublabel": "on a customer call", "pos": [40, 40], "size": [150, 56] },
+    { "id": "web-ui", "type": "frontend", "label": "Support web page", "sublabel": "app/static/index.html", "pos": [40, 190], "size": [150, 56],
+      "sources": [
+        { "path": "app/static/index.html", "line": 88, "end_line": 92, "label": "load customer list" },
+        { "path": "app/static/index.html", "line": 141, "end_line": 165, "label": "POST /chat" }
+      ] },
+    { "id": "chat-app", "type": "backend", "label": "Chat app", "sublabel": "FastAPI :8000", "tag": "in-memory sessions", "pos": [280, 190], "size": [150, 56],
+      "sources": [
+        { "path": "app/main.py", "line": 25, "end_line": 49, "label": "routes and /chat" },
+        { "path": "docker-compose.yml", "line": 46, "end_line": 56, "label": "app service" }
+      ] },
+    { "id": "chatbot", "type": "backend", "label": "Chatbot orchestrator", "sublabel": "rag/chatbot.py", "pos": [520, 190], "size": [150, 56],
+      "sources": [
+        { "path": "rag/chatbot.py", "line": 41, "end_line": 66, "label": "build context per route" },
+        { "path": "rag/chatbot.py", "line": 68, "end_line": 95, "label": "classify, answer, history" }
+      ] },
+    { "id": "intent", "type": "backend", "label": "Intent classifier", "sublabel": "rag/intent.py", "tag": "rag / status / profile", "pos": [520, 40], "size": [150, 56],
+      "sources": [
+        { "path": "rag/intent.py", "line": 49, "end_line": 77, "label": "classify + route rules" }
+      ] },
+    { "id": "retriever", "type": "backend", "label": "Hybrid retriever", "sublabel": "dense + BM25, RRF k=60", "tag": "cross-encoder top 5", "pos": [520, 340], "size": [150, 56],
+      "sources": [
+        { "path": "rag/retriever.py", "line": 43, "end_line": 62, "label": "dense and BM25 search" },
+        { "path": "rag/retriever.py", "line": 65, "end_line": 72, "label": "reciprocal rank fusion" },
+        { "path": "rag/retriever.py", "line": 75, "end_line": 88, "label": "rerank, own docs only" }
+      ] },
+    { "id": "ollama", "type": "external", "label": "Ollama on host", "sublabel": ":11434", "tag": "llama3.2:1b / llama3.2 / all-minilm", "pos": [1000, 40], "size": [150, 656],
+      "sources": [
+        { "path": "docker-compose.yml", "line": 9, "end_line": 15, "label": "OLLAMA_HOST and models" },
+        { "path": "rag/chatbot.py", "line": 75, "end_line": 81, "label": "streamed answer" },
+        { "path": "ingestion/vector_store.py", "line": 33, "end_line": 34, "label": "embeddings" }
+      ] },
+    { "id": "customer-api", "type": "backend", "label": "Customer API", "sublabel": "FastAPI :8001 + SQLite", "pos": [280, 340], "size": [150, 56],
+      "sources": [
+        { "path": "customer_api/server.py", "line": 8, "end_line": 46, "label": "startup + endpoints" },
+        { "path": "customer_api/db.py", "line": 104, "end_line": 113, "label": "load insurance.db from S3" }
+      ] },
+    { "id": "s3", "type": "cloud", "label": "S3 bucket (Floci)", "sublabel": "insurance-docs :4566", "tag": "PDFs + database/insurance.db", "pos": [280, 490], "size": [150, 56],
+      "sources": [
+        { "path": "docker-compose.yml", "line": 25, "end_line": 34, "label": "floci service" },
+        { "path": "ingestion/dms.py", "line": 14, "end_line": 25, "label": "path-style client, bucket" }
+      ] },
+    { "id": "chroma", "type": "database", "label": "ChromaDB", "sublabel": "insurance_docs, cosine", "pos": [520, 490], "size": [150, 56],
+      "sources": [
+        { "path": "ingestion/vector_store.py", "line": 37, "end_line": 40, "label": "persistent collection" }
+      ] },
+    { "id": "uploader", "type": "backend", "label": "PDF uploader", "sublabel": "ingestion/dms.py", "pos": [280, 640], "size": [150, 56],
+      "sources": [
+        { "path": "ingestion/dms.py", "line": 28, "end_line": 35, "label": "upload files/*.pdf" }
+      ] },
+    { "id": "indexer", "type": "backend", "label": "Indexer", "sublabel": "ingestion/index.py", "tag": "section chunks, 256 tokens", "pos": [520, 640], "size": [150, 56],
+      "sources": [
+        { "path": "ingestion/index.py", "line": 38, "end_line": 59, "label": "hash check per S3 key" },
+        { "path": "ingestion/index.py", "line": 24, "end_line": 35, "label": "chunk, embed, replace" },
+        { "path": "ingestion/chunker.py", "line": 84, "end_line": 111, "label": "section chunking" }
+      ] },
+    { "id": "manifest", "type": "database", "label": "Hash manifest", "sublabel": "vectorstore/manifest.json", "pos": [520, 790], "size": [150, 56],
+      "sources": [
+        { "path": "ingestion/hash_tracker.py", "line": 5, "end_line": 21, "label": "sha256 + model per key" }
+      ] },
+    { "id": "pdfs", "type": "external", "label": "Policy PDFs", "sublabel": "files/ on host", "pos": [40, 640], "size": [150, 56],
+      "sources": [
+        { "path": "docker-compose.yml", "line": 58, "end_line": 64, "label": "indexer mounts ./files" }
+      ] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Docker Compose: floci / customer-api / app / indexer", "wraps": ["chat-app", "chatbot", "intent", "retriever", "customer-api", "s3", "chroma", "uploader", "indexer", "manifest"] }
+  ],
+  "connections": [
+    { "id": "agent-uses-page", "from": "agent", "to": "web-ui", "label": "asks", "variant": "emphasis" },
+    { "id": "page-to-app", "from": "web-ui", "to": "chat-app", "label": "POST /chat", "variant": "emphasis" },
+    { "id": "app-to-chatbot", "from": "chat-app", "to": "chatbot", "label": "ask()", "variant": "emphasis" },
+    { "id": "chatbot-to-intent", "from": "chatbot", "to": "intent", "label": "1. classify" },
+    { "id": "intent-to-ollama", "from": "intent", "to": "ollama", "label": "llama3.2:1b, JSON schema" },
+    { "id": "chatbot-to-ollama", "from": "chatbot", "to": "ollama", "label": "4. stream answer, llama3.2", "variant": "emphasis" },
+    { "id": "chatbot-to-retriever", "from": "chatbot", "to": "retriever", "label": "2. if rag route" },
+    { "id": "retriever-to-ollama", "from": "retriever", "to": "ollama", "label": "embed query" },
+    { "id": "retriever-to-chroma", "from": "retriever", "to": "chroma", "label": "dense + BM25 corpus" },
+    { "id": "app-to-customer-api", "from": "chat-app", "to": "customer-api", "label": "profile panel" },
+    { "id": "chatbot-to-customer-api", "from": "chatbot", "to": "customer-api", "label": "3. policies, status", "fromSide": "left", "toSide": "right" },
+    { "id": "customer-api-to-s3", "from": "customer-api", "to": "s3", "label": "get insurance.db at start" },
+    { "id": "pdfs-to-uploader", "from": "pdfs", "to": "uploader", "label": "read" },
+    { "id": "uploader-to-s3", "from": "uploader", "to": "s3", "label": "put PDFs" },
+    { "id": "indexer-reads-s3", "from": "indexer", "to": "s3", "label": "get PDFs", "fromSide": "left", "toSide": "right" },
+    { "id": "indexer-to-chroma", "from": "indexer", "to": "chroma", "label": "replace chunks + vectors" },
+    { "id": "indexer-to-ollama", "from": "indexer", "to": "ollama", "label": "embed chunks, all-minilm" },
+    { "id": "indexer-to-manifest", "from": "indexer", "to": "manifest", "label": "skip unchanged sha256" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Query path", "items": [
+      "Classifier picks routes; every non-small-talk question also searches documents",
+      "Search is limited to the customer's own policy PDFs (document_key)",
+      "Answer model sees only retrieved chunks and customer data"
+    ] },
+    { "dot": "emerald", "title": "Ingestion", "items": [
+      "Compose indexer job runs dms.py then index.py",
+      "Unchanged sha256 + same embedding model: skipped",
+      "Headings found by font size, bold and numbering"
+    ] },
+    { "dot": "amber", "title": "Delivery (GitHub Actions)", "items": [
+      "ci.yml: ruff, pytest with Floci service, image build",
+      "eval.yml: routing, retrieval, answer scores weekly",
+      "deploy.yml: SSH to server, compose up, run indexer"
+    ] }
+  ]
+}
